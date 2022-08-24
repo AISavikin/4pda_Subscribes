@@ -23,9 +23,8 @@ class DataBase:
         self.cursor = self.connection.cursor()
         self.err = ""
 
-
-    def read_all(self, table_name: str):
-        sql_query = f"SELECT * FROM {table_name}"
+    def read_all(self, table: str = 'subscribes'):
+        sql_query = f"SELECT * FROM {table}"
         try:
             self.cursor.execute(sql_query)
             record = self.cursor.fetchall()
@@ -36,9 +35,8 @@ class DataBase:
             self.err = error
             self.close()
 
-
-    def read_one(self, table_name, target):
-        sql_query = f"SELECT * FROM {table_name} WHERE userid={target}"
+    def read_one(self, target, table='subscribes'):
+        sql_query = f"SELECT * FROM {table} WHERE userid={target}"
         try:
             self.cursor.execute(sql_query)
             record = self.cursor.fetchone()
@@ -49,10 +47,9 @@ class DataBase:
             self.err = error
             self.close()
 
-
-    def insert(self, user_id):
+    def insert(self, user_id, table='subscribes'):
         try:
-            sql_query = f"INSERT INTO subscribes (userid) VALUES ({user_id}) ON CONFLICT DO NOTHING"
+            sql_query = f"INSERT INTO {table} (userid) VALUES ({user_id}) ON CONFLICT DO NOTHING"
             self.cursor.execute(sql_query)
             self.connection.commit()
             self.close()
@@ -61,7 +58,7 @@ class DataBase:
             self.err = error
             self.close()
 
-    def update(self, table, field, new_value, target):
+    def update(self, field, new_value, target, table='subscribes'):
         try:
             sql_query = f"UPDATE {table} SET {field} = '{new_value}' WHERE userid={target}"
             self.cursor.execute(sql_query)
@@ -73,8 +70,7 @@ class DataBase:
             self.err = error
             self.close()
 
-
-    def delete(self, table, target):
+    def delete(self, target, table='subscribes'):
         try:
             sql_query = f"DELETE FROM {table} WHERE userid={target}"
             self.cursor.execute(sql_query)
@@ -92,6 +88,10 @@ class DataBase:
             print(self.err)
 
 
+
+
+
+
 if __name__ == '__main__':
     test = DataBase()
-    print(test.delete('subscribes', 100))
+    print(test.read_one(333100))
