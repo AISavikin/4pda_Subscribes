@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import requests
 from bot import bot
 
+# название категорий
 CATEGORIES = (
     'news_smartphones', 'news_notebook', 'news_pc', 'news_appliances',
     'news_audio', 'news_monitors', 'news_games',
@@ -12,6 +13,7 @@ CATEGORIES = (
     'reviews_accessories', 'reviews_notebooks', 'reviews_audio', 'all_news'
 )
 
+# URL категорий
 URLS = (
     'https://4pda.to/tag/smartphones/', 'https://4pda.to/tag/laptops/', 'https://4pda.to/tag/pc/',
     'https://4pda.to/tag/appliances/', 'https://4pda.to/tag/audio/', 'https://4pda.to/tag/monitors/',
@@ -20,6 +22,7 @@ URLS = (
     'https://4pda.to/reviews/laptops/', 'https://4pda.to/reviews/audio/', 'https://4pda.to/'
 )
 
+# Человекочитаемые название категорий
 NAMES = (
     'Новости/Смартфоны', 'Новости/Ноутбуки', 'Новости/ПК', 'Новости/Бытовая техника', 'Новости/Аудио',
     'Новости/Тв и мониторы', 'Новости/Игры', 'Обзоры/Смартфоны', 'Обзоры/Планшеты', 'Обзоры/Умные часы',
@@ -28,14 +31,23 @@ NAMES = (
 
 
 class ForPDA:
-
+    """
+    Класс для получения новостей с сайта и формирования индивидуальных пакетов новостей, для каждого пользователя.
+    Создаётся и используется в функции send_news
+    """
     def __init__(self):
         self.users_subscribe_status = self.get_users_subscribe_status()
         self.news = self.get_news()
         self.ids_news = {key: list(reversed([item for item in self.news[key]])) for key in self.news}
+        self.users_news = self.collect_users_news()
         self.collect_users_news()
 
-    def get_news(self):
+    @staticmethod
+    def get_news():
+        """
+        Получает последние 3 новости с сайта 4pda.to в каждой категории, парсит и собирает в словарь.
+        :return: dict {category:{news_id:(description, title, href, img)}
+        """
         news = {}
         for cat in zip(CATEGORIES, URLS):
             html = requests.get(cat[1]).text
@@ -49,25 +61,36 @@ class ForPDA:
                     continue
                 item_id = i.get('itemid')
                 title = i.find('a').get('title')
+                img = i.find('img').get('src')
                 try:
                     description = i.find('p').text
                     if description == '':
                         continue
                 except:
                     continue
-                data[item_id] = (description, title, href)
+                data[item_id] = (description, title, href, img)
                 if len(data) == 3:
                     break
             news[cat[0]] = data
 
         return news
 
-    def get_users_subscribe_status(self):
+    @staticmethod
+    def get_users_subscribe_status():
+        """
+        Берет из базы данных информацию о статусе подписки для всех пользователей из базы данных.
+        Если пользователь подписан на категорию, то в словарь помещается последний актуальный id новости
+        из базы данных.
+        :return: dict {user_id:{category:{id_news}}}
+        """
         users = DataBase().read_all()
         users = {user[0]: get_subscribe_status(user[0]) for user in users}
         return users
 
     def collect_users_news(self):
+        """
+        Собирает пакет новостей для каждого конкретного пользователя
+        """
         users_news = {
             user: {cat: [] for cat in self.users_subscribe_status[user] if self.users_subscribe_status[user][cat]} for
             user in self.users_subscribe_status}
@@ -80,7 +103,7 @@ class ForPDA:
                 else:
                     users_news[user][cat] = [self.ids_news[cat][i] for i in range(len(self.ids_news[cat])) if
                                              i > self.ids_news[cat].index(last_id)]
-        self.users_news = users_news
+        return users_news
 
 
 # region
@@ -122,23 +145,22 @@ def get_item(url):
 async def send_news(wait_for):
     while True:
         await asyncio.sleep(wait_for)
-        print('сработало')
         fpda = ForPDA()
         users = [int(user) for user in fpda.users_subscribe_status]
         for user in users:
             for cat in fpda.users_news[user]:
                 for post_id in fpda.users_news[user][cat]:
-                    title = fpda.news[cat][post_id][0]
-                    text = fpda.news[cat][post_id][1]
+                    text = fpda.news[cat][post_id][0]
+                    title = fpda.news[cat][post_id][1]
                     url = fpda.news[cat][post_id][2]
-                    await bot.send_message(user, url)
+                    img = fpda.news[cat][post_id][3]
+                    await bot.send_photo(user, img, parse_mode=types.ParseMode.HTML,
+                                         caption=f'<b>{title}</b>\n\n{text}\n<a href="{url}">Перейти к новости на сайт 4PDA</a>')
                 DataBase().update(cat, fpda.ids_news[cat][-1], user)
 
 
 def main():
-    fpda = ForPDA()
-    print(fpda.ids_news)
-
+    pass
 
 if __name__ == '__main__':
     main()
